@@ -18,6 +18,8 @@ connectToDB();
 app.use("/api/courses", courseRouter)
 app.use("/api/users", userRouter)
 app.use("/api/orders", orderRouter)
+app.use("/api/user-courses", userCourseRouter);
+
 
 let port=process.env.PORT
 app.listen(port, () => {

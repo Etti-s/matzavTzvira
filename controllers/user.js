@@ -1,21 +1,29 @@
 import { userModel } from "../models/user.js";
 import { isStrongPassword, isValidEmail } from "../utils/validators.js";
-import { hash, compare, hashSync, compareSync } from "bcryptjs"
+import { hash, compare } from "bcryptjs";
 
-//עבור המנהל קבלת כל המשתמשים
+// פונקציית עזר לבדיקת ObjectId
+const isValidObjectId = (id) => {
+    return id && id.match(/^[0-9a-fA-F]{24}$/);
+};
+
+// עבור המנהל - קבלת כל המשתמשים
 export const getAllUsers = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;   // מספר העמוד הנוכחי
-        const limit = parseInt(req.query.limit) || 10; // כמה משתמשים בעמוד
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        // שליפת משתמשים לפי עמוד
-        const users = await userModel
-            .find({ status: true }, { password: 0 })
-            .skip(skip)
-            .limit(limit);
+        // אפשר לסנן לפי סטטוס או להחזיר הכל
+        const statusFilter = req.query.status === 'false' ? { status: false } : 
+                            req.query.status === 'true' ? { status: true } : {};
 
-        const total = await userModel.countDocuments({ status: true });
+        const users = await userModel
+            .find(statusFilter, { password: 0 })
+            .skip(skip)
+            .limit(limit)
+
+        const total = await userModel.countDocuments(statusFilter);
         const totalPages = Math.ceil(total / limit);
 
         return res.json({
@@ -25,26 +33,46 @@ export const getAllUsers = async (req, res) => {
             totalUsers: total
         });
     } catch (err) {
-        return res.status(500).json({ title: "Error retrieving users", message: err });
+        return res.status(500).json({ 
+            title: "Error retrieving users", 
+            message: err.message 
+        });
     }
 };
 
-//הרשמה
+// הרשמה
 export const signUp = async (req, res) => {
     try {
         if (!req.body)
-            return res.status(400).json({ title: "missing body", message: "no data" });
+            return res.status(400).json({ 
+                title: "missing body", 
+                message: "no data" 
+            });
 
         let { username, password, email, profileImageUrl } = req.body;
+
         if (!username || !password || !email)
-            return res.status(400).json({ title: "missing data", message: "username, password, email are required" });
+            return res.status(400).json({ 
+                title: "missing data", 
+                message: "username, password, email are required" 
+            });
+
+        // בדיקת אורך username
+        if (username.trim().length < 2 || username.trim().length > 50)
+            return res.status(400).json({ 
+                title: "invalid username", 
+                message: "username must be between 2-50 characters" 
+            });
 
         // בדיקת תקינות אימייל
         if (!isValidEmail(email)) {
-            return res.status(400).json({ title: "invalid email", message: "Email is not valid" });
+            return res.status(400).json({ 
+                title: "invalid email", 
+                message: "Email is not valid" 
+            });
         }
 
-        // בדיקת סיסמה 
+        // בדיקת סיסמה
         if (!isStrongPassword(password)) {
             return res.status(400).json({
                 title: "weak password",
@@ -52,24 +80,41 @@ export const signUp = async (req, res) => {
             });
         }
 
-        const already = await userModel.findOne({ email });
+        // בדיקת כפילות
+        const already = await userModel.findOne({ email: email.toLowerCase() });
         if (already)
-            return res.status(409).json({ title: "duplicate user", message: "user with such email already exists" });
+            return res.status(409).json({ 
+                title: "duplicate user", 
+                message: "user with such email already exists" 
+            });
 
-        let hashedPassword = hashSync(password, process.env.SALT_ROUNDS ? parseInt(process.env.SALT_ROUNDS) : 10);
-        //console.log(hashedPassword);
+        // הצפנת סיסמה 
+        let hashedPassword = await hash(
+            password, 
+            parseInt(process.env.SALT_ROUNDS) || 10
+        );
 
-        const newUser = new userModel({ username, password: hashedPassword, email, profileImageUrl });
+        const newUser = new userModel({ 
+            username: username.trim(), 
+            password: hashedPassword, 
+            email: email.toLowerCase().trim(), 
+            profileImageUrl 
+        });
+
         const user = await newUser.save();
 
         let { password: _, ...other } = user.toObject();
         return res.status(201).json(other);
 
     } catch (err) {
-        return res.status(500).json({ title: "Error adding user", message: err });
+        return res.status(500).json({ 
+            title: "Error adding user", 
+            message: err.message 
+        });
     }
 };
-//כניסת משתמש
+
+// כניסת משתמש
 export const login = async (req, res) => {
     try {
         const { email, password: pass } = req.body;
@@ -80,7 +125,7 @@ export const login = async (req, res) => {
                 message: "email and password are required"
             });
 
-        const user = await userModel.findOne({ email });
+        const user = await userModel.findOne({ email: email.toLowerCase() });
         if (!user)
             return res.status(401).json({
                 title: "invalid credentials",
@@ -93,7 +138,8 @@ export const login = async (req, res) => {
                 message: "Your account is inactive. Please contact support."
             });
 
-        const isMatch = compareSync(pass, user.password);
+        // השוואת סיסמה 
+        const isMatch = await compare(pass, user.password);
         if (!isMatch)
             return res.status(401).json({
                 title: "invalid credentials",
@@ -106,12 +152,12 @@ export const login = async (req, res) => {
     } catch (err) {
         return res.status(500).json({
             title: "Error logging in",
-            message: err
+            message: err.message
         });
     }
 };
 
-//עדכון סיסמא
+// עדכון סיסמא
 export const updatePassword = async (req, res) => {
     try {
         const { userId, oldPassword, newPassword } = req.body;
@@ -120,6 +166,14 @@ export const updatePassword = async (req, res) => {
             return res.status(400).json({
                 title: "missing data",
                 message: "userId, oldPassword and newPassword are required"
+            });
+        }
+
+        // בדיקת תקינות userId
+        if (!isValidObjectId(userId)) {
+            return res.status(400).json({
+                title: "invalid userId",
+                message: "userId format is invalid"
             });
         }
 
@@ -134,12 +188,13 @@ export const updatePassword = async (req, res) => {
         const user = await userModel.findById(userId);
         if (!user) {
             return res.status(404).json({
-                title: "user not found"
+                title: "user not found",
+                message: "user not found"
             });
         }
 
-        // בדיקת סיסמה נוכחית
-        const isMatch = compareSync(oldPassword, user.password);
+        // בדיקת סיסמה נוכחית 
+        const isMatch = await compare(oldPassword, user.password);
         if (!isMatch) {
             return res.status(401).json({
                 title: "invalid password",
@@ -147,10 +202,10 @@ export const updatePassword = async (req, res) => {
             });
         }
 
-        // הצפנת הסיסמה החדשה
-        const hashedPassword = hashSync(
+        // הצפנת הסיסמה החדשה 
+        const hashedPassword = await hash(
             newPassword,
-            process.env.SALT_ROUNDS ? parseInt(process.env.SALT_ROUNDS) : 10
+            parseInt(process.env.SALT_ROUNDS) || 10
         );
 
         user.password = hashedPassword;
@@ -164,12 +219,12 @@ export const updatePassword = async (req, res) => {
     } catch (err) {
         return res.status(500).json({
             title: "Error updating password",
-            message: err
+            message: err.message
         });
     }
 };
 
-//עדכון כל הפרטים
+// עדכון כל הפרטים
 export const updateDetails = async (req, res) => {
     try {
         const { userId, username, email, profileImageUrl } = req.body;
@@ -180,57 +235,98 @@ export const updateDetails = async (req, res) => {
                 message: "userId is required"
             });
 
+        // בדיקת תקינות userId
+        if (!isValidObjectId(userId)) {
+            return res.status(400).json({
+                title: "invalid userId",
+                message: "userId format is invalid"
+            });
+        }
+
         const updateData = {};
 
-        if (username) updateData.username = username;
-        if (profileImageUrl) updateData.profileImageUrl = profileImageUrl;
+        if (username !== undefined) {
+            if (username.trim().length < 2 || username.trim().length > 50)
+                return res.status(400).json({ 
+                    title: "invalid username", 
+                    message: "username must be between 2-50 characters" 
+                });
+            updateData.username = username.trim();
+        }
 
-        if (email) {
+        if (profileImageUrl !== undefined) 
+            updateData.profileImageUrl = profileImageUrl;
+
+        if (email !== undefined) {
             // בדיקת תקינות אימייל
             if (!isValidEmail(email)) {
-                return res.status(400).json({ title: "invalid email", message: "Email is not valid" });
+                return res.status(400).json({ 
+                    title: "invalid email", 
+                    message: "Email is not valid" 
+                });
             }
             // בדיקת כפילות אימייל (למעט המשתמש עצמו)
-            const already = await userModel.findOne({ email, _id: { $ne: userId } });
+            const already = await userModel.findOne({ 
+                email: email.toLowerCase(), 
+                _id: { $ne: userId } 
+            });
             if (already)
                 return res.status(409).json({
                     title: "duplicate user",
                     message: "user with such email already exists"
                 });
 
-            updateData.email = email;
+            updateData.email = email.toLowerCase().trim();
         }
 
-        if (!username && !email && !profileImageUrl) {
+        if (Object.keys(updateData).length === 0) {
             return res.status(400).json({
                 title: "no data to update",
                 message: "No fields were provided"
             });
         }
 
-        const updatedUser = await userModel.findByIdAndUpdate(userId, updateData, { new: true });
+        const updatedUser = await userModel.findByIdAndUpdate(
+            userId, 
+            updateData, 
+            { new: true }
+        );
 
         if (!updatedUser)
-            return res.status(404).json({ title: "user not found" });
+            return res.status(404).json({ 
+                title: "user not found",
+                message: "user not found"
+            });
 
         const { password, ...other } = updatedUser.toObject();
         return res.json(other);
 
     }
     catch (err) {
-        return res.status(500).json({ title: "Error updating details", message: err });
+        return res.status(500).json({ 
+            title: "Error updating details", 
+            message: err.message 
+        });
     }
 };
 
-//עדכון סטטוס
+// עדכון סטטוס
 export const toggleUserStatus = async (req, res) => {
     try {
-        const { userId } = req.body; // או req.params אם שולחים דרך ה-URL
+        const { userId } = req.body;
 
         if (!userId) {
             return res.status(400).json({ 
                 title: "missing data", 
                 message: "userId is required" 
+            });
+        }
+
+        // בדיקת תקינות userId
+        if (!isValidObjectId(userId)) {
+            return res.status(400).json({
+                title: "invalid userId",
+                message: "userId format is invalid"
             });
         }
 
@@ -252,7 +348,7 @@ export const toggleUserStatus = async (req, res) => {
     } catch (err) {
         return res.status(500).json({ 
             title: "Error updating status", 
-            message: err 
+            message: err.message 
         });
     }
 };
