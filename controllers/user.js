@@ -19,7 +19,8 @@ export const getAllUsers = async (req, res) => {
                             req.query.status === 'true' ? { status: true } : {};
 
         const users = await userModel
-            .find(statusFilter, { password: 0 })
+            .find(statusFilter)
+            .select('-password')
             .skip(skip)
             .limit(limit)
 
@@ -203,6 +204,7 @@ export const updatePassword = async (req, res) => {
         }
 
         // הצפנת הסיסמה החדשה 
+       
         const hashedPassword = await hash(
             newPassword,
             parseInt(process.env.SALT_ROUNDS) || 10

@@ -112,7 +112,7 @@ export async function canUserAccessCourse(req, res) {
         }).lean();
 
         if (!userCourse) {
-            return res.json({ 
+            return res.status(403).json({ 
                 canAccess: false,
                 message: "You don't have access to this course"
             });

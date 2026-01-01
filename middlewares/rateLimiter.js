@@ -57,7 +57,7 @@ export const orderLimiter = rateLimit({
     max: 10,
     message: {
         title: "Too many orders",
-        message: "Too many orders created, please try again later"
+        message: "You are creating too many orders. Please try again later."
     },
     standardHeaders: true,
     legacyHeaders: false,
