@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
 
-const courseMinimalSchema=new mongoose.Schema({
-    name: String,
-    price: Number,
-    numLessons: Number,
-    imgUrl: String
-})
+const courseMinimalSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    numLessons: { type: Number, required: true },
+    imgUrl: { type: String, required: true }
+}, { _id: false });
 
 const orderSchema = new mongoose.Schema({
     userId: {
@@ -13,13 +13,13 @@ const orderSchema = new mongoose.Schema({
         ref: "users",
         required: true
     },
-    product: [ courseMinimalSchema ],
+    products: [courseMinimalSchema], 
+    totalPrice: { type: Number, required: true }, 
     status: {
         type: String,
-        enum: [ "pending","paid","active","cancelled"],
+        enum: ["pending", "paid", "active", "cancelled"],
         default: 'pending'
     }
-
-}, { timestamps: true })
+}, { timestamps: true });
 
 export const orderModel = mongoose.model('orders', orderSchema);

@@ -10,4 +10,13 @@ export function connectToDB() {
             console.log("Error connecting to database", err);
             process.exit(1);
         });
+    // טיפול בניתוק פתאומי
+    mongoose.connection.on('disconnected', () => {
+        console.warn("⚠️ MongoDB disconnected");
+    });
+
+    // טיפול בשגיאות אחרי החיבור הראשוני
+    mongoose.connection.on('error', (err) => {
+        console.error("❌ MongoDB connection error:", err.message);
+    });
 }

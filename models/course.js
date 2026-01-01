@@ -1,24 +1,22 @@
-import mongoose from "mongoose"
+import mongoose from "mongoose";
+
+const videoSchema = new mongoose.Schema({
+    title: { type: String },
+    videoUrl: { type: String },
+    durationMinutes: { type: Number }
+}, { _id: true });
 
 export const courseSchema = new mongoose.Schema({
-    name: String,
-    price: Number,
-    numLessons: Number,
-    contentLength: Number,
-    imgUrl: String,
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    numLessons: { type: Number, required: true },
+    imgUrl: { type: String, required: true },
     isPurchasable: {
         type: Boolean,
         default: true
     },
-    videos: [
-        {
-            title: String,
-            videoUrl: String,
-            durationMinutes: Number 
-        }
-    ],
-    notes: String
-});
-
+    videos: [videoSchema],
+    notes: { type: String }
+}, { timestamps: true });
 
 export const courseModel = mongoose.model('courses', courseSchema);
