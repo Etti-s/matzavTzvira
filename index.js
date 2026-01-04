@@ -5,7 +5,7 @@ import { connectToDB } from "./config/db.js";
 import courseRouter from "./routes/course.js";
 import userRouter from "./routes/user.js";
 import orderRouter from "./routes/order.js";
-
+import userCourseRouter from "./routes/userCourse.js";
 dotenv.config();
 
 const app=express()
