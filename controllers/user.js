@@ -15,8 +15,8 @@ export const getAllUsers = async (req, res) => {
         const skip = (page - 1) * limit;
 
         // אפשר לסנן לפי סטטוס או להחזיר הכל
-        const statusFilter = req.query.status === 'false' ? { status: false } : 
-                            req.query.status === 'true' ? { status: true } : {};
+        const statusFilter = req.query.status === 'false' ? { status: false } :
+            req.query.status === 'true' ? { status: true } : {};
 
         const users = await userModel
             .find(statusFilter)
@@ -34,9 +34,9 @@ export const getAllUsers = async (req, res) => {
             totalUsers: total
         });
     } catch (err) {
-        return res.status(500).json({ 
-            title: "Error retrieving users", 
-            message: err.message 
+        return res.status(500).json({
+            title: "Error retrieving users",
+            message: err.message
         });
     }
 };
@@ -45,31 +45,31 @@ export const getAllUsers = async (req, res) => {
 export const signUp = async (req, res) => {
     try {
         if (!req.body)
-            return res.status(400).json({ 
-                title: "missing body", 
-                message: "no data" 
+            return res.status(400).json({
+                title: "missing body",
+                message: "no data"
             });
 
         let { username, password, email, profileImageUrl } = req.body;
 
         if (!username || !password || !email)
-            return res.status(400).json({ 
-                title: "missing data", 
-                message: "username, password, email are required" 
+            return res.status(400).json({
+                title: "missing data",
+                message: "username, password, email are required"
             });
 
         // בדיקת אורך username
         if (username.trim().length < 2 || username.trim().length > 50)
-            return res.status(400).json({ 
-                title: "invalid username", 
-                message: "username must be between 2-50 characters" 
+            return res.status(400).json({
+                title: "invalid username",
+                message: "username must be between 2-50 characters"
             });
 
         // בדיקת תקינות אימייל
         if (!isValidEmail(email)) {
-            return res.status(400).json({ 
-                title: "invalid email", 
-                message: "Email is not valid" 
+            return res.status(400).json({
+                title: "invalid email",
+                message: "Email is not valid"
             });
         }
 
@@ -84,22 +84,22 @@ export const signUp = async (req, res) => {
         // בדיקת כפילות
         const already = await userModel.findOne({ email: email.toLowerCase() });
         if (already)
-            return res.status(409).json({ 
-                title: "duplicate user", 
-                message: "user with such email already exists" 
+            return res.status(409).json({
+                title: "duplicate user",
+                message: "user with such email already exists"
             });
 
         // הצפנת סיסמה 
         let hashedPassword = await hash(
-            password, 
+            password,
             parseInt(process.env.SALT_ROUNDS) || 10
         );
 
-        const newUser = new userModel({ 
-            username: username.trim(), 
-            password: hashedPassword, 
-            email: email.toLowerCase().trim(), 
-            profileImageUrl 
+        const newUser = new userModel({
+            username: username.trim(),
+            password: hashedPassword,
+            email: email.toLowerCase().trim(),
+            profileImageUrl
         });
 
         const user = await newUser.save();
@@ -108,9 +108,9 @@ export const signUp = async (req, res) => {
         return res.status(201).json(other);
 
     } catch (err) {
-        return res.status(500).json({ 
-            title: "Error adding user", 
-            message: err.message 
+        return res.status(500).json({
+            title: "Error adding user",
+            message: err.message
         });
     }
 };
@@ -148,7 +148,11 @@ export const login = async (req, res) => {
             });
 
         const { password, ...other } = user.toObject();
-        return res.json(other);
+        return res.json({
+            id: other._id,
+            email: other.email,
+            name: other.username
+        });
 
     } catch (err) {
         return res.status(500).json({
@@ -204,7 +208,7 @@ export const updatePassword = async (req, res) => {
         }
 
         // הצפנת הסיסמה החדשה 
-       
+
         const hashedPassword = await hash(
             newPassword,
             parseInt(process.env.SALT_ROUNDS) || 10
@@ -249,28 +253,28 @@ export const updateDetails = async (req, res) => {
 
         if (username !== undefined) {
             if (username.trim().length < 2 || username.trim().length > 50)
-                return res.status(400).json({ 
-                    title: "invalid username", 
-                    message: "username must be between 2-50 characters" 
+                return res.status(400).json({
+                    title: "invalid username",
+                    message: "username must be between 2-50 characters"
                 });
             updateData.username = username.trim();
         }
 
-        if (profileImageUrl !== undefined) 
+        if (profileImageUrl !== undefined)
             updateData.profileImageUrl = profileImageUrl;
 
         if (email !== undefined) {
             // בדיקת תקינות אימייל
             if (!isValidEmail(email)) {
-                return res.status(400).json({ 
-                    title: "invalid email", 
-                    message: "Email is not valid" 
+                return res.status(400).json({
+                    title: "invalid email",
+                    message: "Email is not valid"
                 });
             }
             // בדיקת כפילות אימייל (למעט המשתמש עצמו)
-            const already = await userModel.findOne({ 
-                email: email.toLowerCase(), 
-                _id: { $ne: userId } 
+            const already = await userModel.findOne({
+                email: email.toLowerCase(),
+                _id: { $ne: userId }
             });
             if (already)
                 return res.status(409).json({
@@ -289,13 +293,13 @@ export const updateDetails = async (req, res) => {
         }
 
         const updatedUser = await userModel.findByIdAndUpdate(
-            userId, 
-            updateData, 
+            userId,
+            updateData,
             { new: true }
         );
 
         if (!updatedUser)
-            return res.status(404).json({ 
+            return res.status(404).json({
                 title: "user not found",
                 message: "user not found"
             });
@@ -305,9 +309,9 @@ export const updateDetails = async (req, res) => {
 
     }
     catch (err) {
-        return res.status(500).json({ 
-            title: "Error updating details", 
-            message: err.message 
+        return res.status(500).json({
+            title: "Error updating details",
+            message: err.message
         });
     }
 };
@@ -318,9 +322,9 @@ export const toggleUserStatus = async (req, res) => {
         const { userId } = req.body;
 
         if (!userId) {
-            return res.status(400).json({ 
-                title: "missing data", 
-                message: "userId is required" 
+            return res.status(400).json({
+                title: "missing data",
+                message: "userId is required"
             });
         }
 
@@ -334,9 +338,9 @@ export const toggleUserStatus = async (req, res) => {
 
         const user = await userModel.findById(userId);
         if (!user) {
-            return res.status(404).json({ 
-                title: "user not found", 
-                message: "No user with this id" 
+            return res.status(404).json({
+                title: "user not found",
+                message: "No user with this id"
             });
         }
 
@@ -348,9 +352,9 @@ export const toggleUserStatus = async (req, res) => {
         return res.json(other);
 
     } catch (err) {
-        return res.status(500).json({ 
-            title: "Error updating status", 
-            message: err.message 
+        return res.status(500).json({
+            title: "Error updating status",
+            message: err.message
         });
     }
 };
